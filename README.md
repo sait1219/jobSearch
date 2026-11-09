@@ -1,4 +1,4 @@
-# Local job-search assistant
+#  job-search assistant
 
 A Python CLI for discovering, assessing and tracking jobs, with an optional OpenAI agent and cover-letter drafting. Python 3.10+; standard library only. AI commands require internet access and billable OpenAI API requests. Review drafts before submitting applications yourself.
 
