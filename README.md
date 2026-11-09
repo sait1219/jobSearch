@@ -1,4 +1,4 @@
-# AI job-search assistant
+#  job-search assistant
 
 A deterministic Python CLI for discovering, assessing and tracking jobs against your profile. Python 3.10+; standard library only. Arbeitnow search requires internet access but no API key. It does not yet use an LLM, generate final application documents, fill forms or submit applications.
 
