@@ -1,6 +1,32 @@
 # Local job-search assistant
 
-A deterministic Python CLI for discovering, assessing and tracking jobs against your profile. Python 3.10+; standard library only. Arbeitnow search requires internet access but no API key. It does not yet use an LLM, generate final application documents, fill forms or submit applications.
+A Python CLI for discovering, assessing and tracking jobs, with an optional OpenAI agent and cover-letter drafting. Python 3.10+; standard library only. AI commands require internet access and billable OpenAI API requests. Review drafts before submitting applications yourself.
+
+## OpenAI agent
+
+In `.env`, set `OPENAI_API_KEY=your_key`. Optionally set `OPENAI_MODEL=gpt-4.1-mini` (the default). Existing environment variables override `.env`. Plain and quoted values are supported; shell expansion is not. `.env.example` contains placeholders only.
+
+With your virtual environment active:
+
+```powershell
+python main.py ai-check
+python main.py agent "Find suitable Python developer jobs in Stuttgart and assess up to three matches."
+python main.py agent "Review saved jobs and prepare an English cover-letter draft for the best developer match."
+python main.py ai-assess --limit 3
+python main.py ai-assess JOB_ID
+python main.py ai-assess JOB_ID --refresh
+python main.py ai-draft JOB_ID --language English
+```
+
+Without an ID, `ai-assess` evaluates the most recently updated real vacancies, then sorts that selected batch by AI score. It does not assess the whole database by default. Results include recommendation, role/seniority/language fit, gaps, questions and CV evidence IDs. Fictional demos are excluded. Assessments are cached in SQLite and invalidated by profile/job/model/prompt/schema changes. `rank` still uses offline keyword scoring; use `ai-assess` for AI results.
+
+The agent can search Arbeitnow, list saved vacancies, assess jobs and save drafts. It has no shell, email, deletion, status-change or submission tools. Each run allows at most two searches (20 pages each), eight model/tool steps, twelve total API requests, five distinct assessments and three drafts. These are activity limits, not a monetary spending cap. Failures do not silently fall back to heuristic results; completed results remain saved. Network failures are not automatically retried.
+
+Drafts are timestamped Markdown files under `applications/JOB_ID/`, preserving previous drafts. They include review notes and evidence references. Unknown evidence IDs are rejected, but every generated sentence still needs review. German drafts do not imply German proficiency beyond your profile. Scores are fit judgments, not hiring probabilities.
+
+AI commands send selected career evidence, skills, preferences and job descriptions to OpenAI. Name, contact fields, links, credentials and provenance paths are omitted from candidate context. Do not put secrets into career evidence or agent requests. Requests use `store=false`; this does not guarantee zero provider retention. API errors do not print keys or raw response bodies. Job content is treated as untrusted data in prompts.
+
+The implementation uses the official [Responses function-calling guide](https://developers.openai.com/api/docs/guides/function-calling) and [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
 
 ## Run
 
@@ -12,7 +38,7 @@ python main.py search
 python main.py rank
 ```
 
-Search defaults to Stuttgart and Python/software/AI/ML/security title keywords. Locations and keywords are matched locally against a paginated feed, not sent as API search parameters. By default only the first five pages are scanned; this is not an exhaustive search. Increase the cap to scan older postings (maximum 100 pages). Examples:
+Search defaults to Stuttgart and Python/software/AI/ML/security title keywords. Locations and keywords are matched locally against a paginated feed, not sent as API search parameters. By default only the first ten pages are scanned; this is not an exhaustive search. Increase the cap to scan older postings (maximum 100 pages). Examples:
 
 ```powershell
 python main.py search --location Stuttgart --location Boeblingen --location Sindelfingen --pages 20
@@ -49,5 +75,5 @@ Candidate data and generated files remain local and are ignored by Git by defaul
 
 1. Improve search and filtering using feedback from Arbeitnow results.
 2. Evaluate matching with real adverts and your feedback.
-3. Add optional LLM drafting using approved CV evidence.
+3. Improve AI assessments and drafts using reviewed outcomes.
 4. Add application review and browser-assisted submission.

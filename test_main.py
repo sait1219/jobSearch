@@ -1,3 +1,4 @@
+import contextlib
 import json
 import tempfile
 import unittest
@@ -9,7 +10,10 @@ from main import ROOT, assess, connect, import_jobs
 class JobAssistantTests(unittest.TestCase):
     def setUp(self):
         self.profile = json.loads((ROOT / "profile.json").read_text(encoding="utf-8-sig"))
-        self.jobs = json.loads((ROOT / "jobs.example.json").read_text(encoding="utf-8"))
+        self.jobs = [
+            {"title": "Junior Python Developer", "company": "Test company", "description": "Python Docker Linux", "url": "https://example.com/test1", "english_accepted": True},
+            {"title": "Security Engineer", "company": "Test company", "description": "Security", "url": "https://example.com/test2"},
+        ]
 
     def test_language_requirement_reduces_same_job_score(self):
         accepted = dict(self.jobs[0], german_requirement="A2")
@@ -19,7 +23,7 @@ class JobAssistantTests(unittest.TestCase):
 
     def test_reimport_preserves_status_without_duplicates(self):
         with tempfile.TemporaryDirectory() as directory:
-            with connect(Path(directory) / "jobs.sqlite3") as db:
+            with contextlib.closing(connect(Path(directory) / "jobs.sqlite3")) as db:
                 import_jobs(db, self.jobs)
                 identifier = db.execute("SELECT id FROM jobs LIMIT 1").fetchone()[0]
                 db.execute("UPDATE jobs SET status='applied' WHERE id=?", (identifier,))
@@ -30,7 +34,7 @@ class JobAssistantTests(unittest.TestCase):
 
     def test_invalid_batch_imports_nothing(self):
         with tempfile.TemporaryDirectory() as directory:
-            with connect(Path(directory) / "jobs.sqlite3") as db:
+            with contextlib.closing(connect(Path(directory) / "jobs.sqlite3")) as db:
                 with self.assertRaises(ValueError):
                     import_jobs(db, [self.jobs[0], {"title": "Incomplete"}])
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0], 0)

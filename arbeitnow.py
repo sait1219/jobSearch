@@ -9,6 +9,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 API = "https://www.arbeitnow.com/api/job-board-api"
+DEFAULT_PAGES = 10
 DEFAULT_KEYWORDS = ("python", "software", "machine learning", "ai", "ml", "security", "cybersecurity", "ki", "softwareentwicklung", "softwareentwickler")
 
 
@@ -95,7 +96,7 @@ def fetch_page(page):
         raise ValueError(f"Could not connect to Arbeitnow: {exc}") from exc
 
 
-def search(locations, keywords, max_pages=10, fetcher=None):
+def search(locations, keywords, max_pages=DEFAULT_PAGES, fetcher=None):
     """Return matches and scan statistics, without writing partial results on failure."""
     if not 1 <= max_pages <= 100:
         raise ValueError("pages must be between 1 and 100")

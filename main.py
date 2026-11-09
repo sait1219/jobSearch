@@ -8,7 +8,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from arbeitnow import DEFAULT_KEYWORDS, search
+from arbeitnow import DEFAULT_KEYWORDS, DEFAULT_PAGES, search
 
 ROOT = Path(__file__).resolve().parent
 STATUSES = ("saved", "reviewing", "applied", "interview", "rejected", "offer", "withdrawn")
@@ -153,7 +153,17 @@ def main(argv=None):
     discover.add_argument("--location", action="append", help="City to match; repeat for nearby cities (default: Stuttgart)")
     discover.add_argument("--keyword", action="append", help="Title keyword; repeat for alternatives (default: target role keywords)")
     discover.add_argument("--all-roles", action="store_true", help="Disable title filtering")
-    discover.add_argument("--pages", type=int, default=5, help="Maximum feed pages to scan (1-100; default: 5)")
+    discover.add_argument("--pages", type=int, default=DEFAULT_PAGES, help=f"Maximum feed pages to scan (1-100; default: {DEFAULT_PAGES})")
+    ai = sub.add_parser("ai-assess", help="Assess saved real vacancies with OpenAI (cached)")
+    ai.add_argument("id", nargs="?", help="Optional saved job ID; otherwise assess recent vacancies")
+    ai.add_argument("--limit", type=int, default=3, choices=range(1, 11), metavar="1-10")
+    ai.add_argument("--refresh", action="store_true", help="Reassess even if cached")
+    letter = sub.add_parser("ai-draft", help="Create an evidence-based cover-letter draft")
+    letter.add_argument("id")
+    letter.add_argument("--language", choices=("English", "German"), default="English")
+    agent_parser = sub.add_parser("agent", help="Ask the OpenAI agent to search, assess or draft")
+    agent_parser.add_argument("request")
+    sub.add_parser("ai-check", help="Make one small request to check OpenAI credentials and model")
     rank = sub.add_parser("rank", help="Rank saved jobs with reasons and review flags")
     rank.add_argument("--limit", type=int, default=10)
     rank.add_argument("--status", choices=STATUSES)
@@ -167,6 +177,40 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         profile = read_json(args.profile)
+        if args.command in ("ai-assess", "ai-draft", "agent", "ai-check"):
+            from ai_jobs import draft_application, evaluate, is_demo
+            from llm_client import Client, output_text
+            client = Client(ROOT / ".env")
+            if args.command == "ai-check":
+                response = client.respond("Reply with OK only.", "Connection check", max_output_tokens=16)
+                print(f"OpenAI connection successful ({client.model}): {output_text(response)}")
+                return 0
+            with connect(args.db) as db:
+                if args.command == "agent":
+                    from agent import run_agent
+                    print(run_agent(db, profile, client, args.request, ROOT / "applications", import_jobs))
+                elif args.command == "ai-draft":
+                    row = db.execute("SELECT data FROM jobs WHERE id=?", (args.id,)).fetchone()
+                    if not row:
+                        raise ValueError("Unknown job ID")
+                    print("Saved draft: " + draft_application(db, args.id, json.loads(row[0]), profile, client, ROOT / "applications", args.language))
+                else:
+                    rows = db.execute("SELECT * FROM jobs WHERE id=?", (args.id,)).fetchall() if args.id else db.execute("SELECT * FROM jobs ORDER BY updated_at DESC").fetchall()
+                    if args.id and not rows:
+                        raise ValueError("Unknown job ID")
+                    results = []
+                    for row in rows:
+                        job = json.loads(row["data"])
+                        if is_demo(job):
+                            continue
+                        result, cached = evaluate(db, row["id"], job, profile, client, args.refresh)
+                        results.append({"id": row["id"], "title": job["title"], "url": job.get("url"), "cached": cached, **result})
+                        if len(results) >= args.limit:
+                            break
+                    results.sort(key=lambda r: -r["score"])
+                    print(json.dumps(results, ensure_ascii=False, indent=2))
+            print(f"OpenAI requests: {client.requests}; tokens reported: {client.tokens}")
+            return 0
         if args.command == "search":
             if args.all_roles and args.keyword:
                 raise ValueError("Use either --all-roles or --keyword")
