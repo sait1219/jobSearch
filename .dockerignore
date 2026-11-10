@@ -1,0 +1,9 @@
+# Allow only application code into the build context.
+**
+!Dockerfile
+!.dockerignore
+!main.py
+!arbeitnow.py
+!llm_client.py
+!ai_jobs.py
+!agent.py

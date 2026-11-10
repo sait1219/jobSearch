@@ -1,0 +1,24 @@
+services:
+  jobsearch:
+    build: .
+    image: jobsearch:local
+    init: true
+    volumes:
+      - type: bind
+        source: ./profile.json
+        target: /app/profile.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./.env
+        target: /app/.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data
+        target: /app/data
+      - type: bind
+        source: ./applications
+        target: /app/applications

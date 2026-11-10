@@ -30,6 +30,35 @@ The implementation uses the official [Responses function-calling guide](https://
 
 ## Run
 
+### Docker (PowerShell)
+
+Start Docker Desktop with Linux containers enabled. No host Python installation or virtual environment is needed. From this project folder, ensure `profile.json` and `.env` exist, then:
+
+```powershell
+New-Item -ItemType Directory -Force data, applications | Out-Null
+docker compose build
+docker compose run --rm jobsearch --help
+docker compose run --rm jobsearch search --pages 10
+docker compose run --rm jobsearch rank
+docker compose run --rm jobsearch ai-check
+docker compose run --rm jobsearch agent "Find Python developer jobs in Stuttgart and assess three matches."
+docker compose run --rm jobsearch ai-draft JOB_ID --language English
+```
+
+The container runs as a non-root user and exits after each command. `--rm` removes that command's container. Your existing `data/jobs.sqlite3` and generated `applications/` files persist in the host folders; the container uses the same saved jobs as your local Python commands. `profile.json` and `.env` are mounted read-only at runtime. Neither they nor your virtual environment, saved database or documents enter the image's build context. The image contains application code only. No port needs publishing because this is a CLI.
+
+Use `docker compose run`, rather than `docker compose up`, to pass each CLI command. Rebuild with `docker compose build` after changing Python source. Profile and `.env` changes are read on the next run without rebuilding. Keep `OPENAI_API_KEY` and optional `OPENAI_MODEL` in `.env`; the application reads the mounted file itself. OpenAI commands have the same API billing/quota requirements inside Docker. File links printed as `/app/applications/...` refer to your host `applications/` folder.
+
+Manual JSON imports need an additional mount, since job JSON files are excluded from the image:
+
+```powershell
+docker compose run --rm -v "${PWD}/jobs.example.json:/app/import.json:ro" jobsearch import /app/import.json
+```
+
+If Docker reports a missing `docker_engine` pipe or cannot connect to the daemon, start Docker Desktop and wait until its Linux engine is running. On Linux hosts, make the mounted output folders writable by container UID 10001 or run with your host UID/GID. See Docker's [build-context documentation](https://docs.docker.com/build/concepts/context/#dockerignore-files) for how `.dockerignore` excludes private files.
+
+### Local Python
+
 Install Python 3.10+ if unavailable, then use `python` (or `py` on Windows):
 
 ```powershell
